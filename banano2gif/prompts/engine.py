@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 banano2gif 提示词工程引擎
-支持任意主体与动作（通用化），彻底去除 1~9 / 01~09 序号，采用纯空间方位映射与微动作渐变闭环。
+支持：
+  1. 文生（Text-to-GIF）：纯自然语言描述生成九宫格连续动图
+  2. 图生（Image-to-GIF）：基于用户参考图（头像/立绘/照片）保持高一致性角色生成连续动图
+彻底去除 1~9 / 01~09 序号，采用纯空间方位映射与微动作渐变闭环。
 """
 
 from typing import Optional, List, Dict
 
-# 常见动态表情包内置 9 帧微动作预设（纯空间方位描述，严禁任何数字序号）
 ACTION_PRESETS: Dict[str, Dict[str, str]] = {
     "waving": {
         "title": "挥手打招呼",
@@ -102,9 +104,7 @@ ACTION_PRESETS: Dict[str, Dict[str, str]] = {
 
 
 def build_generic_motion_flow(subject: str, action: str) -> str:
-    """
-    当用户提供任意自定义动作时，自动生成 9 帧微幅渐变描述（无数字序号，纯方位映射）。
-    """
+    """自动生成 9 帧微幅渐变描述（纯方位映射）"""
     return (
         f"Top row - left panel: {subject} in starting pose, beginning {action}. "
         f"Top row - center panel: {subject} makes subtle preparatory motion, body shifts slightly. "
@@ -123,9 +123,11 @@ def build_prompt(
     preset: Optional[str] = None,
     style: str = "High-end 3D animation render, soft ambient lighting, clean pastel background, Pop Mart collectible figurine style",
     custom_motion: Optional[str] = None,
+    has_reference_image: bool = False,
 ) -> str:
     """
-    生成符合 banano2gif 规范的高品质九宫格连续帧提示词：
+    生成符合 banano2gif 规范的连续帧提示词：
+    - 支持文生图与参考图生图（图生图）
     - 绝无任何 1~9 / 01~09 等数字序号
     - 强制机位锁定 (LOCKED CAMERA)
     - 强制微动作首尾闭环 (SEAMLESS LOOP)
@@ -138,11 +140,18 @@ def build_prompt(
         subject_and_action = f"{subject_and_action}, {p['description']}"
         motion_desc = p["motion"]
     else:
-        # 智能通用流
         motion_desc = build_generic_motion_flow(subject_and_action, "the smooth looping action")
+
+    reference_anchor = ""
+    if has_reference_image:
+        reference_anchor = (
+            "REFERENCE CHARACTER LOCK: Maintain exact, strict identity consistency with the character/subject in the provided reference image. "
+            "Preserve identical facial features, eye shape, hairstyle, hair color, clothing style, key accessories, and aesthetic identity across all 9 panels. "
+        )
 
     prompt = (
         f"A clean 3x3 animation contact sheet grid consisting of exactly 9 sequential square panels showing ONE continuous, smooth micro-motion cycle: "
+        f"{reference_anchor}"
         f"{subject_and_action}. "
         f"CRITICAL MOTION RULES: "
         f"1. LOCKED CAMERA: Absolutely static camera, identical distance, identical zoom, static background. The main body of the character stays in the exact same physical coordinates across all 9 panels. "

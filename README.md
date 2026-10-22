@@ -1,7 +1,8 @@
 # banano2gif 🍌➡️🎞️
 
-> **基于 AI 大模型九宫格连续序列帧的表情包与平滑无缝循环 GIF 动图生成引擎**  
-> 默认内置官方 SDK，开箱即用。支持任意角色主体与动作，彻底去除数字角标，精准切帧，丝滑循环。
+> **全能 AI 表情包与动态帧生成引擎**  
+> 支持【**文生动图**、**图生动图（垫图/参考图锁脸）**、**视频转动图**】全模态！  
+> 默认内置官方原生 SDK，开箱即用。彻底去除数字角标，精准对齐切帧，合成丝滑无缝循环 GIF / WebP。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-brightgreen.svg)](https://www.python.org/)
@@ -19,7 +20,7 @@
 
 ## 🔑 获取 API Key
 
-本项目默认内置封装了轻量级原生 SDK，直连 **HrioAPI** 官方平台（支持 `gemini-nano-banana-2.1`、`gpt-image-2` 等最顶尖生图大模型）：
+本项目默认内置封装了轻量级原生 SDK，直连 **HrioAPI** 官方平台（全面接入 `gemini-nano-banana-2.1`、`gpt-image-2`、`gemini-3.1-flash-image` 等主流多模态生图大模型）：
 
 1. 前往官方网站注册登录：👉 **[https://hrioapi.hrio.site](https://hrioapi.hrio.site)**
 2. 进入用户后台创建并复制您的专属 API Key (`sk-xxxxxxxx`)。
@@ -37,45 +38,66 @@
 
 ---
 
-## ✨ 核心特性
+## 🚀 三大核心生成模式 (All-in-One Multimodal)
 
-- 🎯 **去数字序号机制（No 1~9 Numbers）**：
-  - 彻底抛弃易诱导 AI 生成角标的 `1, 2, 3...` / `01, 02...` 编号写法；
-  - 采用严密的**纯空间方位映射（Top-left, Middle-center, Bottom-right...）**与强制负向约束，生成 100% 干净无水印原画。
-- 💃 **全场景通用动作生成（Beyond Just Cats）**：
-  - 不仅支持可爱的女孩玩猫，更支持任意主体（人物、动物、机甲、二次元、像素风、3D盲盒）；
-  - 内置常见动态表情包预设（挥手打招呼、哈哈大笑、委屈哭泣、眨眼比心、竖大拇指点赞等），并支持智能展开任意自定义连续动作。
-- 📐 **工业级高精度定点裁切（Precision Slicing）**：
-  - 实测剖析 1024×1024 图像的分割白线位置（X=341/682, Y=341/684），运用**中心对称定点裁切法（320×320）**；
-  - 完美剔除所有分割白边，保证 9 帧画面中心同轴、零镜头抖动。
-- 📦 **开箱即用，零繁琐依赖**：
-  - 内置封装完整的 API Client，全工程除 `Pillow` 处理图片外无任何沉重第三方依赖。
+### 1. 📝 文生动图 (Text-to-GIF)
+输入纯文本提示词或选用内置预设，AI 自动根据 9 帧微幅渐变机理生成连续无缝的九宫格并切片合成动图。
+```bash
+python main.py "可爱的3D柴犬戴着红色围巾" --preset waving
+```
+
+### 2. 🖼️ 图生动图 / 参考图生图 (Image-to-GIF)
+传入用户的头像、照片或立绘作为**参考图（垫图）**，在保持角色面部、五官、发型与穿搭高度一致的前提下，生成专属动态表情包！
+```bash
+python main.py "温柔地向镜头挥手打招呼" --image "avatar.jpg" --preset waving
+```
+
+### 3. 🎥 视频转动图 (Video-to-GIF)
+支持 MP4、MOV、WebM、AVI 等任意格式视频，自动采样关键帧并进行中心正方形裁切，直接转换为高画质轻量表情包（支持 GIF 与 WebP 双格式输出）。
+```bash
+python main.py --video "dance.mp4" --fps 10 --out output
+```
 
 ---
 
-## 🚀 快速上手
+## ✨ 核心亮点
+
+- 🎯 **彻底去除数字序号（No 1~9 Numbers）**：
+  - 彻底抛弃易诱导 AI 渲染角标的 `1, 2, 3...` / `01, 02...` 编号；
+  - 采用严密的**纯空间方位排布（Top-left, Middle-center, Bottom-right...）**与强制负向约束，生成 100% 纯净无水印原画。
+- 📐 **工业级高精度定点裁切（Precision Slicing）**：
+  - 实测剖析 1024×1024 图像的分割白线位置（X=341/682, Y=341/684），运用**中心对称定点裁切法（320×320）**；
+  - 完美剔除所有分割白边，保证 9 帧画面中心同轴、零镜头抖动。
+- 🎞️ **多种动图格式导出（GIF + WebP）**：
+  - 同时输出标准通用的 `.gif` 与画质更高、体积更小的现代动态 `.webp`。
+- 📦 **内置官方 SDK，开箱即用**：
+  - 内置封装完整的 HrioClient，无需额外寻找或安装外部包。
+
+---
+
+## 💻 快速安装与使用
 
 ### 1. 安装依赖
 ```bash
-git clone https://github.com/Mag1cFall/banano2gif.git
+git clone https://github.com/moki-flank/banano2gif.git
 cd banano2gif
 pip install -r requirements.txt
 ```
 
-### 2. 命令行一键生成 (CLI)
+### 2. 命令行使用示例
 
 ```bash
 # 查看所有支持的内置微动作预设
 python main.py --list-presets
 
-# 示例 1: 使用内置动作预设（挥手打招呼）
-python main.py "可爱的3D柴犬戴着红色围巾" --preset waving --key "sk-xxxx"
-
-# 示例 2: 生成摸摸头/玩猫猫表情包
+# 示例 1: 文生图（使用摸摸头预设）
 python main.py "萌系Q版小女孩摸摸白猫的头" --preset petting --duration 180
 
-# 示例 3: 完全自定义任意动作与风格
-python main.py "赛博朋克机甲猫咪从胸口发射出一颗旋转爱心光波" --style "Cyberpunk neon anime style"
+# 示例 2: 图生图（传入参考头像保持角色一致）
+python main.py "灿烂地哈哈大笑" --image "my_avatar.png" --preset laughing
+
+# 示例 3: 视频直转动图
+python main.py --video "cat_video.mp4" --fps 10
 ```
 
 ### 3. Python 代码集成
@@ -83,17 +105,17 @@ python main.py "赛博朋克机甲猫咪从胸口发射出一颗旋转爱心光�
 ```python
 from banano2gif import banano2gif
 
-# 一键完成：构建提示词 -> 请求生图 -> 精准切帧 -> 合成 GIF
-result = banano2gif(
-    prompt="萌系Q版小女孩温柔抚摸白猫的头",
-    preset="petting",       # 可选内置微动作预设
-    duration_ms=180,        # 每帧播放毫秒数（推荐 160~200ms）
-    api_key="sk-xxxx",      # 未传则自动读取环境变量 HRIO_API_KEY
-    output_dir="output",
-)
+# 1. 文生动图
+res1 = banano2gif(prompt="宇航员在月球表面跳舞", preset="waving")
 
-print("🎉 GIF 制作成功:", result["gif_path"])
-print("📁 9张无缝序列帧保存在:", result["frames_dir"])
+# 2. 图生动图（垫图保持人设一致）
+res2 = banano2gif(image_path="avatar.jpg", prompt="眨眼比心", preset="heart_wink")
+
+# 3. 视频转动图
+res3 = banano2gif(video_path="input.mp4")
+
+print("生成的动图路径:", res2["gif_path"])
+print("生成的WebP路径:", res2["webp_path"])
 ```
 
 ---
@@ -103,7 +125,7 @@ print("📁 9张无缝序列帧保存在:", result["frames_dir"])
 | 预设代码 (`--preset`) | 动作名称 | 动作循环逻辑与幅度 |
 | :--- | :--- | :--- |
 | `waving` | **挥手打招呼** | 手臂从胸前抬起 -> 掌心向前左右摆动 15° -> 欢快微笑 -> 降回胸前闭环循环 |
-| `petting` | **温柔抚摸宠物** | 手掌凌空逼近 -> 掌心触碰额头 -> 顺滑抚摸至后颈/背部 -> 猫咪眯眼仰头享受 -> 手抬起归位闭环 |
+| `petting` | **温柔抚摸宠物** | 手掌凌空逼近 -> 掌心触碰额头 -> 顺滑抚摸至后颈/背部 -> 猫咪眯眼仰头享受 -> 归位闭环 |
 | `laughing` | **哈哈大笑/欢脱** | 微笑挑眉 -> 仰头放声大笑 -> 肩膀微微颤动欢脱 -> 缓和回笑闭环 |
 | `crying` | **委屈哭泣/泪目** | 憋嘴泛泪 -> 泪珠滑落 -> 爆出动漫瀑布泪花 -> 抽泣擦泪闭环 |
 | `heart_wink` | **眨眼比心** | 灿烂微笑 -> 右眼眨眼 Wink -> 手指搓出爱心光波飘起 -> 归位闭环 |
@@ -111,32 +133,6 @@ print("📁 9张无缝序列帧保存在:", result["frames_dir"])
 
 ---
 
-## 🛠️ 目录架构说明
-
-```
-banano2gif/
-  ├── banano2gif/
-  │     ├── __init__.py          # 模块导出接口
-  │     ├── core.py              # 主调度逻辑（生图、切帧、GIF合成）
-  │     ├── sdk/                 # 内置 HrioAPI 客户端封装 (无需安装外部包)
-  │     │     ├── __init__.py
-  │     │     └── client.py
-  │     ├── prompts/             # 提示词工程引擎（去序号、锁机位、微动模板）
-  │     │     ├── __init__.py
-  │     │     └── engine.py
-  │     └── cutter/              # 图像裁切与动图合成
-  │           ├── __init__.py
-  │           ├── slicer.py      # 九宫格高精度定点裁切器 (剔除分割线)
-  │           └── gif_builder.py # 平滑无限循环 GIF 打包器
-  ├── examples/                  # 官方实测示例效果图与动图
-  ├── main.py                    # 命令行入口脚本
-  ├── setup.py                   # 安装配置文件
-  ├── requirements.txt           # 基础运行依赖 (Pillow)
-  └── README.md                  # 中英文使用与开发文档
-```
-
----
-
 ## 📄 开源许可证
 
-本项目基于 [MIT License](LICENSE) 开源协议。欢迎提交 PR 与 Issue！
+本项目基于 [MIT License](LICENSE) 开源协议。欢迎 Star 与 PR！
