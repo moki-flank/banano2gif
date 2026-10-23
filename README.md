@@ -1,6 +1,7 @@
 # banano2gif 🍌➡️🎞️
 
 > **全能 AI 表情包与动态帧生成引擎**  
+> 原生支持【**纯 Web 前端免后端运行 (Pure Web / GitHub Pages)**】！  
 > 原生支持【**4K 超高清九宫格出图 (4096x4096)**】！  
 > 支持【**文生动图**、**图生动图（垫图/参考图锁脸）**、**动作生成迁移 (Motion Transfer)**、**视频直转动图**】全模态！  
 > 原生支持【**8-bit Alpha 完整半透明通道 WebP 与透明 GIF**】智能去底！  
@@ -8,6 +9,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-brightgreen.svg)](https://www.python.org/)
+[![Web Version](https://img.shields.io/badge/Web%20App-Pure%20HTML%2FJS-blueviolet.svg)](web/index.html)
 [![API Platform](https://img.shields.io/badge/API%20Platform-HrioAPI-orange.svg)](https://hrioapi.hrio.site)
 
 ---
@@ -17,6 +19,16 @@
 | 1. AI 渲染九宫格原图 (纯净无角标) | 2. 智能去底透明背景循环动图 (支持 WebP / GIF) |
 | :---: | :---: |
 | <img src="examples/sample_grid.jpg" width="380" alt="九宫格原图" /> | <img src="examples/sample_crying_transparent.gif" width="300" alt="透明背景无缝循环动图" /> |
+
+---
+
+## 🌐 纯 Web 前端免安装方案 (Pure Web SPA)
+
+如果你不想配置 Python 环境，可以直接使用项目中附带的**纯前端单页应用 (`web/index.html`)**：
+* **零后端、免装环境**：只需双击 `web/index.html` 即可在任意浏览器（Edge、Chrome、Safari）中打开运行；
+* **支持 GitHub Pages 一键托管**：在仓库设置中开启 GitHub Pages，即可拥有全网可访问的个人在线生成站；
+* **浏览器端纯算法抠图与切片**：内置基于 HTML5 Canvas 的外边缘 BFS 去底与九宫格裁切算法，毫秒级响应；
+* **离线模式**：甚至支持在断网情况下，直接将本地已有的九宫格大图拖拽入网页，进行纯本地离线切图、透明化与 GIF 动图合成！
 
 ---
 
@@ -47,21 +59,12 @@
 * **自适应中心裁切**：算法动态计算图像尺寸，1024 图切出 320px 单元格，**4K 图直接切出 1280 × 1280 单帧原生超清大图**！
 * **高质量超采样缩放 (`--export-size`)**：若用于微信/QQ 表情包，可通过 `--export-size 320` 自动将 4K 帧进行 Lanczos 超采样缩放——相比直接生成小图，**线条更锐利、噪点为零、画质呈现降维打击**！
 
-```bash
-# 开启 4K 生图，并导出超清动图
-python main.py "可爱的3D柴犬戴着红色围巾" --preset waving --4k --transparent
-
-# 4K 高画质生成 + 超采样压缩为 320px 规范表情包
-python main.py "萌系少女眨眼比心" --preset heart_wink --4k --export-size 320 --transparent
-```
-
 ---
 
 ## 🚀 四大核心生成模式 (All-in-One Multimodal)
 
-### 1. 🎭 动作生成迁移 (Motion Transfer) —— 核心重磅！
+### 1. 🎭 动作生成迁移 (Motion Transfer)
 直接将**现有的表情包动图 (.gif, .webp) 或一段短视频 (.mp4)** 中的神态动作，迁移至**全新的目标角色图**上！
-- **实现原理**：自动从源媒体中均匀抽样出 9 帧关键动势，缝合成标准 3x3 动作参考指南，与目标角色立绘双图输入大模型，生成完美继承人设但完全复刻源动作的全新表情包！
 ```bash
 python main.py --image "my_avatar.png" --motion-source "funny_dance.gif" --transparent
 ```
@@ -96,46 +99,20 @@ python main.py --video "dance.mp4" --fps 10
 
 ## 💻 快速安装与使用
 
-### 1. 安装依赖
+### 1. 纯 Web 界面运行
+直接双击打开 `web/index.html`，输入你的 API Key 即可全图形化操作。
+
+### 2. Python 命令行使用
 ```bash
 git clone https://github.com/moki-flank/banano2gif.git
 cd banano2gif
 pip install -r requirements.txt
-```
 
-### 2. 命令行使用示例
-
-```bash
 # 查看所有支持的内置微动作预设
 python main.py --list-presets
 
-# 示例 1: 4K 文生动图 + 智能透明化
-python main.py "萌系Q版小女孩摸摸白猫的头" --preset petting --4k --transparent
-
-# 示例 2: 动作迁移（将 meme.gif 的动作提取并迁移到我的头像 avatar.png 上）
-python main.py --image "my_avatar.png" --motion-source "meme.gif" --transparent
-
-# 示例 3: 4K 图生动图（传入参考头像保持人设一致）
+# 4K 图生动图并开启透明背景
 python main.py "委屈哭泣" --image "avatar.png" --preset crying --4k --transparent
-```
-
-### 3. Python 代码集成
-
-```python
-from banano2gif import banano2gif
-
-# 开启 4K 模式 (is_4k=True) 并导出透明动图
-result = banano2gif(
-    image_path="avatar.png",
-    preset="crying",
-    is_4k=True,             # 开启 4K 超高分辨率九宫格
-    export_size=320,        # 可选：超采样至 320px 便捷表情包（不传则输出 1280px 超清大图）
-    transparent=True,       # 开启智能透明背景
-    duration_ms=180,
-)
-
-print("生成的动图路径:", result["gif_path"])
-print("生成的WebP路径:", result["webp_path"])
 ```
 
 ---
