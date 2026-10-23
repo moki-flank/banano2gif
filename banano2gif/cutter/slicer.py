@@ -2,23 +2,28 @@
 """
 九宫格高精度切割器：
 基于中心对称裁切算法，完美避开 3x3 图像中的分割白线，输出对齐、无白边、无抖动的 9 帧序列。
+支持可选的自动透明背景抠图（transparent=True）。
 """
 
 import os
 from typing import List, Tuple, Union, Optional
 from PIL import Image
 
+from .matting import remove_background
+
 
 def slice_grid(
     image_input: Union[str, Image.Image],
     output_dir: Optional[str] = None,
     crop_size: int = 320,
+    transparent: bool = False,
 ) -> List[Image.Image]:
     """
     将 3x3 九宫格图片切割为 9 张独立图像。
     image_input: 图片文件路径或 PIL.Image 对象
     output_dir: 若传入路径，则自动将 9 帧保存为 frame_01.png ~ frame_09.png
     crop_size: 每帧裁切的正方形边长（1024分辨率下推荐 320，安全避开分割线）
+    transparent: 是否自动去除纯色背景，输出含 Alpha 通道的透明图
     """
     if isinstance(image_input, str):
         im = Image.open(image_input).convert("RGB")
@@ -57,6 +62,10 @@ def slice_grid(
             y1 = y0 + crop_size
 
             frame = im.crop((x0, y0, x1, y1))
+
+            if transparent:
+                frame = remove_background(frame)
+
             frames.append(frame)
 
             if output_dir:

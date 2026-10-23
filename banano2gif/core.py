@@ -6,6 +6,7 @@ banano2gif 核心流水线引擎
   2. 图生动图 (Image-to-GIF / 参考图生图)
   3. 视频转动图 (Video-to-GIF)
   4. 多种动图格式导出 (GIF / WebP)
+  5. 【透明背景化 (Alpha Channel Matting)】智能抠除纯色背景
 """
 
 import os
@@ -18,6 +19,7 @@ from .prompts.engine import build_prompt, ACTION_PRESETS
 from .cutter.slicer import slice_grid
 from .cutter.gif_builder import build_gif
 from .cutter.video_to_gif import convert_video_to_gif
+from .cutter.matting import remove_background
 
 DEFAULT_MODEL = "gemini-nano-banana-2.1"
 
@@ -40,11 +42,12 @@ class Banano2Gif:
         self,
         prompt: str,
         preset: Optional[str] = None,
-        style: str = "High-end 3D animation render, soft ambient lighting, clean pastel background, Pop Mart collectible figurine style",
+        style: str = "High-end 3D animation render, soft ambient lighting, clean solid white background, Pop Mart collectible figurine style",
         output_dir: str = "output",
         gif_filename: str = "animation.gif",
         duration_ms: int = 180,
         crop_size: int = 320,
+        transparent: bool = False,
     ) -> Dict[str, Any]:
         """
         【文生动图】输入自然语言描述，生成九宫格并合成无缝循环 GIF。
@@ -58,6 +61,7 @@ class Banano2Gif:
             gif_filename=gif_filename,
             duration_ms=duration_ms,
             crop_size=crop_size,
+            transparent=transparent,
             mode="text_to_gif",
         )
 
@@ -66,11 +70,12 @@ class Banano2Gif:
         image_path: str,
         prompt: str = "gently waving and smiling happily",
         preset: Optional[str] = None,
-        style: str = "Preserve original character art style, high quality render",
+        style: str = "Preserve original character art style, high quality render, clean solid white background",
         output_dir: str = "output",
         gif_filename: str = "image_animation.gif",
         duration_ms: int = 180,
         crop_size: int = 320,
+        transparent: bool = False,
     ) -> Dict[str, Any]:
         """
         【图生动图 / 参考图生图】输入角色参考图与动作描述，高度锁脸/锁特征生成连续动图。
@@ -87,6 +92,7 @@ class Banano2Gif:
             gif_filename=gif_filename,
             duration_ms=duration_ms,
             crop_size=crop_size,
+            transparent=transparent,
             mode="image_to_gif",
         )
 
@@ -126,6 +132,7 @@ class Banano2Gif:
         gif_filename: str,
         duration_ms: int,
         crop_size: int,
+        transparent: bool,
         mode: str,
     ) -> Dict[str, Any]:
         os.makedirs(output_dir, exist_ok=True)
@@ -133,7 +140,6 @@ class Banano2Gif:
         frames_dir = os.path.join(output_dir, "frames")
         gif_save_path = os.path.join(output_dir, gif_filename)
 
-        # 1. 提示词构建（去序号、微动作空间排布）
         full_prompt = build_prompt(
             subject_and_action=prompt,
             preset=preset,
@@ -141,12 +147,9 @@ class Banano2Gif:
             has_reference_image=bool(images),
         )
 
-        print(f"[banano2gif] 模式: {mode}")
+        print(f"[banano2gif] 模式: {mode} (透明背景化: {'开启' if transparent else '关闭'})")
         print(f"[banano2gif] 1. 请求大模型生图 (模型: {self.model})...")
-        if images:
-            print(f"[banano2gif] 参考图: {images}")
 
-        # 2. 调用 SDK 生成九宫格图
         resp = self.client.generate_image(self.model, full_prompt, images=images)
         img_url, img_bytes = self.client.extract_image_bytes_or_url(resp)
 
@@ -160,21 +163,20 @@ class Banano2Gif:
         else:
             raise RuntimeError(f"未能从模型返回中提取有效图片数据: {resp}")
 
-        # 3. 高精度切图（去白边、零抖动）
-        print(f"[banano2gif] 2. 正在进行高精度九宫格切割...")
-        frames = slice_grid(grid_save_path, output_dir=frames_dir, crop_size=crop_size)
+        print(f"[banano2gif] 2. 正在进行高精度九宫格切割 (智能去底透明化: {transparent})...")
+        frames = slice_grid(grid_save_path, output_dir=frames_dir, crop_size=crop_size, transparent=transparent)
 
-        # 4. 合成 GIF
-        print(f"[banano2gif] 3. 正在合成平滑动图 ({duration_ms}ms/帧)...")
+        print(f"[banano2gif] 3. 正在合成动图 ({duration_ms}ms/帧)...")
         gif_path = build_gif(frames, output_path=gif_save_path, duration_ms=duration_ms)
 
-        # 同时可导出带 Alpha / 24位的 WebP 动图
+        # 同时导出原生 8 位 Alpha 的 WebP 动图
         webp_save_path = os.path.splitext(gif_save_path)[0] + ".webp"
         build_gif(frames, output_path=webp_save_path, duration_ms=duration_ms)
 
         return {
             "ok": True,
             "mode": mode,
+            "transparent": transparent,
             "gif_path": gif_path,
             "webp_path": webp_save_path,
             "grid_image": grid_save_path,
@@ -190,10 +192,11 @@ def banano2gif(
     image_path: Optional[str] = None,
     video_path: Optional[str] = None,
     preset: Optional[str] = None,
+    transparent: bool = False,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
     model: str = DEFAULT_MODEL,
-    style: str = "High-end 3D animation render, soft ambient lighting, clean pastel background, Pop Mart collectible figurine style",
+    style: str = "High-end 3D animation render, soft ambient lighting, clean solid white background, Pop Mart collectible figurine style",
     output_dir: str = "output",
     duration_ms: int = 180,
 ) -> Dict[str, Any]:
@@ -215,6 +218,7 @@ def banano2gif(
             style=style,
             output_dir=output_dir,
             duration_ms=duration_ms,
+            transparent=transparent,
         )
 
     act_prompt = prompt or "A cute 3D character smiling warmly"
@@ -224,4 +228,5 @@ def banano2gif(
         style=style,
         output_dir=output_dir,
         duration_ms=duration_ms,
+        transparent=transparent,
     )
