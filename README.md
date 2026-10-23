@@ -1,7 +1,7 @@
 # banano2gif 🍌➡️🎞️
 
 > **全能 AI 表情包与动态帧生成引擎**  
-> 支持【**文生动图**、**图生动图（垫图/参考图锁脸）**、**视频转动图**】全模态！  
+> 支持【**文生动图**、**图生动图（垫图/参考图锁脸）**、**动作生成迁移 (Motion Transfer)**、**视频直转动图**】全模态！  
 > 原生支持【**8-bit Alpha 完整半透明通道 WebP 与透明 GIF**】智能去底！  
 > 默认内置官方原生 SDK，开箱即用。彻底去除数字角标，精准对齐切帧，合成丝滑无缝循环动图。
 
@@ -21,7 +21,7 @@
 
 ## 🔑 获取 API Key
 
-本项目默认内置封装了轻量级原生 SDK，直连 **HrioAPI** 官方平台（全面接入 `gemini-nano-banana-2.1`、`gpt-image-2` 等主流多模态生图大模型）：
+本项目默认内置封装了轻量级原生 SDK，直连 **HrioAPI** 官方平台（全面接入 `gemini-nano-banana-2.1`、`gpt-image-2`、`gemini-3.1-flash-image` 等主流多模态生图大模型）：
 
 1. 前往官方网站注册登录：👉 **[https://hrioapi.hrio.site](https://hrioapi.hrio.site)**
 2. 进入用户后台创建并复制您的专属 API Key (`sk-xxxxxxxx`)。
@@ -39,48 +39,40 @@
 
 ---
 
-## 🚀 三大核心生成模式 + 智能透明化
+## 🚀 四大核心生成模式 (All-in-One Multimodal)
 
-### 1. 📝 文生动图 (Text-to-GIF)
-输入纯文本提示词或选用内置预设，AI 自动根据 9 帧微幅渐变机理生成连续无缝的九宫格并切片合成动图。
+### 1. 🎭 动作生成迁移 (Motion Transfer) —— 核心重磅！
+直接将**现有的表情包动图 (.gif, .webp) 或一段短视频 (.mp4)** 中的神态动作，迁移至**全新的目标角色图**上！
+- **实现原理**：自动从源媒体中均匀抽样出 9 帧关键动势，缝合成标准 3x3 动作参考指南，与目标角色立绘双图输入大模型，生成完美继承人设但完全复刻源动作的全新表情包！
 ```bash
-python main.py "可爱的3D柴犬戴着红色围巾" --preset waving
+python main.py --image "my_avatar.png" --motion-source "funny_dance.gif" --transparent
 ```
 
 ### 2. 🖼️ 图生动图 / 参考图生图 (Image-to-GIF)
-传入用户的头像、照片或立绘作为**参考图（垫图）**，在保持角色面部、五官、发型与穿搭高度一致的前提下，生成专属动态表情包！
+传入用户的头像、照片或立绘作为**参考图（垫图）**，在保持角色面部、五官、发型与穿搭高度一致的前提下，生成专属动作表情包！
 ```bash
-python main.py "委屈哭泣流眼泪" --image "avatar.png" --preset crying
+python main.py "委屈哭泣流眼泪" --image "avatar.png" --preset crying --transparent
 ```
 
-### 3. 👻 一键透明背景去底化 (`--transparent`)
-加上 `--transparent` 参数，算法将通过**外边缘泛洪填充 (Exterior Boundary BFS)** 自动提取背景并生成 Alpha 通道，**100% 保护角色体内的白色衣服、高光与发夹不被误扣**：
-- **WebP 格式**：支持**完整的 8-bit Alpha 通道（256 级半透明羽化抗锯齿）**，边缘如丝般顺滑，文件体积轻量，特别适合现代即时通信软件与网页展示。
-- **GIF 格式**：自动映射透明调色板并配置 `disposal=2`，杜绝传统透明 GIF 的层叠残影问题。
+### 3. 📝 文生动图 (Text-to-GIF)
+输入纯文本提示词或选用内置预设，AI 自动根据 9 帧微幅渐变机理生成连续无缝的九宫格并切片合成动图。
 ```bash
-python main.py "可爱的二次元少女挥手" --preset waving --transparent
+python main.py "可爱的3D柴犬戴着红色围巾" --preset waving --transparent
 ```
 
 ### 4. 🎥 视频转动图 (Video-to-GIF)
 支持 MP4、MOV、WebM、AVI 等任意格式视频，自动采样关键帧并进行中心正方形裁切，直接转换为高画质轻量表情包。
 ```bash
-python main.py --video "dance.mp4" --fps 10 --out output
+python main.py --video "dance.mp4" --fps 10
 ```
 
 ---
 
-## ✨ 核心亮点
+## 👻 智能透明背景去底化 (`--transparent`)
 
-- 🎯 **彻底去除数字序号（No 1~9 Numbers）**：
-  - 彻底抛弃易诱导 AI 渲染角标的 `1, 2, 3...` / `01, 02...` 编号；
-  - 采用严密的**纯空间方位排布（Top-left, Middle-center, Bottom-right...）**与强制负向约束，生成 100% 纯净无水印原画。
-- 📐 **工业级高精度定点裁切（Precision Slicing）**：
-  - 实测剖析 1024×1024 图像的分割白线位置（X=341/682, Y=341/684），运用**中心对称定点裁切法（320×320）**；
-  - 完美剔除所有分割白边，保证 9 帧画面中心同轴、零镜头抖动。
-- 🎞️ **全透明与多格式支持（Transparent WebP + GIF）**：
-  - 同时导出支持透明背景的 `.webp` 与 `.gif`。
-- 📦 **内置官方 SDK，开箱即用**：
-  - 内置封装完整的 HrioClient，无需额外寻找或安装外部包。
+加上 `--transparent` 参数，算法将通过**外边缘泛洪填充 (Exterior Boundary BFS)** 自动提取背景并生成 Alpha 通道，**100% 保护角色体内的白色衣服、高光与发夹不被误扣**：
+- **WebP 格式**：支持**完整的 8-bit Alpha 通道（256 级半透明羽化抗锯齿）**，边缘如丝般顺滑，文件体积轻量，特别适合现代即时通信软件与网页展示。
+- **GIF 格式**：自动映射透明调色板并配置 `disposal=2`，杜绝传统透明 GIF 的层叠残影问题。
 
 ---
 
@@ -99,13 +91,16 @@ pip install -r requirements.txt
 # 查看所有支持的内置微动作预设
 python main.py --list-presets
 
-# 示例 1: 文生图并开启透明背景
-python main.py "萌系Q版小女孩摸摸白猫的头" --preset petting --transparent
+# 示例 1: 动作迁移（将 meme.gif 的动作提取并迁移到我的头像 avatar.png 上）
+python main.py --image "my_avatar.png" --motion-source "meme.gif" --transparent
 
 # 示例 2: 图生图（传入参考头像保持人设一致并去底）
 python main.py "委屈哭泣" --image "avatar.png" --preset crying --transparent
 
-# 示例 3: 视频直转动图
+# 示例 3: 文生图并开启透明背景
+python main.py "萌系Q版小女孩摸摸白猫的头" --preset petting --transparent
+
+# 示例 4: 视频直转动图
 python main.py --video "cat_video.mp4" --fps 10
 ```
 
@@ -114,18 +109,22 @@ python main.py --video "cat_video.mp4" --fps 10
 ```python
 from banano2gif import banano2gif
 
-# 开启 transparent=True 即可获得透明背景动图
-result = banano2gif(
-    image_path="avatar.png",
-    prompt="委屈哭泣揉眼睛",
-    preset="crying",
-    transparent=True,       # 开启智能透明背景
+# 1. 动作生成迁移 (Motion Transfer)
+res1 = banano2gif(
+    image_path="target_character.png", # 目标人设图
+    motion_source="source_dance.gif",  # 源动图/视频
+    transparent=True,                  # 开启智能透明背景
     duration_ms=180,
-    api_key="sk-xxxx",
 )
 
-print("透明 GIF 动图:", result["gif_path"])
-print("透明 WebP 动图 (8位Alpha):", result["webp_path"])
+# 2. 图生动图 (垫图保持人设一致)
+res2 = banano2gif(image_path="avatar.png", preset="crying", transparent=True)
+
+# 3. 文生动图
+res3 = banano2gif(prompt="宇航员在月球表面跳舞", preset="waving")
+
+print("生成的动图路径:", res1["gif_path"])
+print("生成的WebP路径:", res1["webp_path"])
 ```
 
 ---

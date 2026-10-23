@@ -4,9 +4,9 @@ banano2gif 核心流水线引擎
 全面支持：
   1. 文生动图 (Text-to-GIF)
   2. 图生动图 (Image-to-GIF / 参考图生图)
-  3. 视频转动图 (Video-to-GIF)
-  4. 多种动图格式导出 (GIF / WebP)
-  5. 【透明背景化 (Alpha Channel Matting)】智能抠除纯色背景
+  3. 动作迁移 (Motion-Transfer / 从GIF、WebP、视频中提取动作迁移到新人设图)
+  4. 视频直转动图 (Video-to-GIF)
+  5. 智能透明背景化 (Alpha Channel Matting)
 """
 
 import os
@@ -15,11 +15,12 @@ from typing import Optional, Dict, Any, List, Union, Tuple
 from PIL import Image
 
 from .sdk.client import HrioClient, DEFAULT_BASE_URL, OFFICIAL_WEBSITE
-from .prompts.engine import build_prompt, ACTION_PRESETS
+from .prompts.engine import build_prompt, build_motion_transfer_prompt, ACTION_PRESETS
 from .cutter.slicer import slice_grid
 from .cutter.gif_builder import build_gif
 from .cutter.video_to_gif import convert_video_to_gif
 from .cutter.matting import remove_background
+from .cutter.motion_extractor import create_motion_guide_grid
 
 DEFAULT_MODEL = "gemini-nano-banana-2.1"
 
@@ -49,9 +50,7 @@ class Banano2Gif:
         crop_size: int = 320,
         transparent: bool = False,
     ) -> Dict[str, Any]:
-        """
-        【文生动图】输入自然语言描述，生成九宫格并合成无缝循环 GIF。
-        """
+        """【文生动图】输入自然语言描述，生成九宫格并合成无缝循环 GIF。"""
         return self._generate_from_prompt(
             prompt=prompt,
             images=None,
@@ -77,9 +76,7 @@ class Banano2Gif:
         crop_size: int = 320,
         transparent: bool = False,
     ) -> Dict[str, Any]:
-        """
-        【图生动图 / 参考图生图】输入角色参考图与动作描述，高度锁脸/锁特征生成连续动图。
-        """
+        """【图生动图 / 参考图生图】输入角色参考图与动作描述，高度锁脸/锁特征生成连续动图。"""
         if not os.path.isfile(image_path) and not image_path.startswith(("http://", "https://")):
             raise FileNotFoundError(f"未找到参考图片文件: {image_path}")
 
@@ -96,6 +93,81 @@ class Banano2Gif:
             mode="image_to_gif",
         )
 
+    def transfer_motion(
+        self,
+        source_media: str,
+        target_image: str,
+        action_hint: str = "transfer the exact 9-step motion and poses from the motion guide to the target character",
+        style: str = "Preserve target character art style, high quality render, clean solid white background",
+        output_dir: str = "output",
+        gif_filename: str = "motion_transfer.gif",
+        duration_ms: int = 180,
+        crop_size: int = 320,
+        transparent: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        【动作生成迁移 (Motion Transfer)】
+        1. 从 source_media (.gif, .webp, .mp4) 中抽取 9 帧关键帧拼成 3x3 动作指南
+        2. 将 target_image (目标人设) + 动作指南双图喂给模型进行动作迁移
+        3. 裁切合成属于新角色的无缝动图
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        if not os.path.isfile(source_media):
+            raise FileNotFoundError(f"未找到源动作媒体文件: {source_media}")
+        if not os.path.isfile(target_image):
+            raise FileNotFoundError(f"未找到目标角色人设图片: {target_image}")
+
+        # 1. 抽取源动作并生成 3x3 动作参考九宫格
+        print(f"[banano2gif] 1. 正在从源媒体抽取 9 帧关键动作九宫格: {source_media}...")
+        guide_grid_path = os.path.join(output_dir, "motion_guide_grid.jpg")
+        create_motion_guide_grid(source_media, output_grid_path=guide_grid_path)
+
+        # 2. 构造动作迁移双图提示词
+        full_prompt = build_motion_transfer_prompt(action_hint=action_hint, style=style)
+        grid_save_path = os.path.join(output_dir, "transferred_grid.jpg")
+        frames_dir = os.path.join(output_dir, "transferred_frames")
+        gif_save_path = os.path.join(output_dir, gif_filename)
+
+        print(f"[banano2gif] 2. 发起跨角色动作迁移生图请求 (模型: {self.model})...")
+        print(f"[banano2gif] 双参考输入: 目标人设={target_image}, 动作指南={guide_grid_path}")
+
+        # 双图注入：[Image 1: 目标角色, Image 2: 动作九宫格]
+        resp = self.client.generate_image(self.model, full_prompt, images=[target_image, guide_grid_path])
+        img_url, img_bytes = self.client.extract_image_bytes_or_url(resp)
+
+        if img_bytes:
+            with open(grid_save_path, "wb") as f:
+                f.write(img_bytes)
+        elif img_url:
+            req = urllib.request.Request(img_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as s, open(grid_save_path, "wb") as f:
+                f.write(s.read())
+        else:
+            raise RuntimeError(f"未能从模型返回中提取有效图片数据: {resp}")
+
+        # 3. 切割与去底
+        print(f"[banano2gif] 3. 正在切帧 (透明去底: {transparent})...")
+        frames = slice_grid(grid_save_path, output_dir=frames_dir, crop_size=crop_size, transparent=transparent)
+
+        # 4. 合成
+        print(f"[banano2gif] 4. 正在合成动作迁移 GIF / WebP...")
+        gif_path = build_gif(frames, output_path=gif_save_path, duration_ms=duration_ms)
+        webp_save_path = os.path.splitext(gif_save_path)[0] + ".webp"
+        build_gif(frames, output_path=webp_save_path, duration_ms=duration_ms)
+
+        return {
+            "ok": True,
+            "mode": "motion_transfer",
+            "source_media": source_media,
+            "target_image": target_image,
+            "motion_guide": guide_grid_path,
+            "grid_image": grid_save_path,
+            "frames_dir": frames_dir,
+            "gif_path": gif_path,
+            "webp_path": webp_save_path,
+            "official_website": OFFICIAL_WEBSITE,
+        }
+
     def video_to_gif(
         self,
         video_path: str,
@@ -104,9 +176,7 @@ class Banano2Gif:
         max_duration_sec: float = 4.0,
         target_size: Optional[Tuple[int, int]] = (320, 320),
     ) -> Dict[str, Any]:
-        """
-        【视频生 / 视频转动图】将任意格式视频转换为表情包 GIF 或 WebP。
-        """
+        """【视频生 / 视频转动图】将任意格式视频转换为表情包 GIF 或 WebP。"""
         print(f"[banano2gif] 正在转换视频: {video_path} -> {output_path}...")
         res_path = convert_video_to_gif(
             video_path=video_path,
@@ -169,7 +239,6 @@ class Banano2Gif:
         print(f"[banano2gif] 3. 正在合成动图 ({duration_ms}ms/帧)...")
         gif_path = build_gif(frames, output_path=gif_save_path, duration_ms=duration_ms)
 
-        # 同时导出原生 8 位 Alpha 的 WebP 动图
         webp_save_path = os.path.splitext(gif_save_path)[0] + ".webp"
         build_gif(frames, output_path=webp_save_path, duration_ms=duration_ms)
 
@@ -191,6 +260,7 @@ def banano2gif(
     prompt: Optional[str] = None,
     image_path: Optional[str] = None,
     video_path: Optional[str] = None,
+    motion_source: Optional[str] = None,
     preset: Optional[str] = None,
     transparent: bool = False,
     api_key: Optional[str] = None,
@@ -201,9 +271,25 @@ def banano2gif(
     duration_ms: int = 180,
 ) -> Dict[str, Any]:
     """
-    智能统一接口：自动根据传入参数分流执行 文生图 / 图生图 / 视频转动图。
+    智能统一接口：自动根据传入参数分流执行：
+      - 动作迁移 (motion_source + image_path)
+      - 视频转动图 (video_path)
+      - 图生动图 (image_path)
+      - 文生动图 (prompt)
     """
     app = Banano2Gif(api_key=api_key, base_url=base_url, model=model)
+
+    if motion_source and image_path:
+        # 动作迁移模式
+        return app.transfer_motion(
+            source_media=motion_source,
+            target_image=image_path,
+            action_hint=prompt or "transfer the exact 9-step motion and poses from the motion guide to the target character",
+            style=style,
+            output_dir=output_dir,
+            duration_ms=duration_ms,
+            transparent=transparent,
+        )
 
     if video_path:
         out_gif = os.path.join(output_dir, "video_animation.gif")

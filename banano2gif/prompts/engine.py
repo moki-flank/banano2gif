@@ -4,6 +4,7 @@ banano2gif 提示词工程引擎
 支持：
   1. 文生（Text-to-GIF）：纯自然语言描述生成九宫格连续动图
   2. 图生（Image-to-GIF）：基于用户参考图（头像/立绘/照片）保持高一致性角色生成连续动图
+  3. 动作迁移（Motion-Transfer）：基于已有动图/视频提取的动作指南 + 目标人设图，进行跨角色动作迁移
 彻底去除 1~9 / 01~09 序号，采用纯空间方位映射与微动作渐变闭环。
 """
 
@@ -121,18 +122,11 @@ def build_generic_motion_flow(subject: str, action: str) -> str:
 def build_prompt(
     subject_and_action: str,
     preset: Optional[str] = None,
-    style: str = "High-end 3D animation render, soft ambient lighting, clean pastel background, Pop Mart collectible figurine style",
+    style: str = "High-end 3D animation render, soft ambient lighting, clean solid white background, Pop Mart collectible figurine style",
     custom_motion: Optional[str] = None,
     has_reference_image: bool = False,
 ) -> str:
-    """
-    生成符合 banano2gif 规范的连续帧提示词：
-    - 支持文生图与参考图生图（图生图）
-    - 绝无任何 1~9 / 01~09 等数字序号
-    - 强制机位锁定 (LOCKED CAMERA)
-    - 强制微动作首尾闭环 (SEAMLESS LOOP)
-    - 严格负向过滤各种水印、数字角标与文字
-    """
+    """常规文生/图生提示词"""
     if custom_motion:
         motion_desc = custom_motion
     elif preset and preset in ACTION_PRESETS:
@@ -159,6 +153,31 @@ def build_prompt(
         f"{motion_desc} "
         f"LAYOUT: Equal 3x3 grid separated by thin, clean, solid white borders. "
         f"STRICT NEGATIVE CONSTRAINT: ABSOLUTELY NO numbers, NO digits, NO frame index watermark (such as 01, 02... 09, 1, 2... 9), NO text, NO labels, NO logos, NO captions anywhere in the image. Every panel must contain 100% pure visual artwork. "
+        f"STYLE: {style}."
+    )
+    return prompt
+
+
+def build_motion_transfer_prompt(
+    action_hint: str = "transfer the exact 9-step motion and poses from the motion guide to the target character",
+    style: str = "Preserve target character art style, high quality render, clean solid white background",
+) -> str:
+    """
+    【动作迁移专用提示词】
+    双参考图输入：
+      Image 1: 目标角色外观图 (Target Subject)
+      Image 2: 源动作提取的 3x3 动作参考图 (Motion Guide Grid)
+    """
+    prompt = (
+        f"A clean 3x3 animation contact sheet grid consisting of exactly 9 sequential square panels. "
+        f"DUAL REFERENCE MOTION TRANSFER TASK: "
+        f"1. TARGET CHARACTER REFERENCE (Image 1): Strictly preserve the exact appearance, face, eyes, hair color, hairstyle, costume, and art style of the character in Image 1. "
+        f"2. MOTION & POSE SEQUENCE GUIDE (Image 2): Image 2 is a 3x3 motion sheet showing a 9-frame animation cycle. "
+        f"Strictly mirror and transfer the EXACT same progressive body posture, hand gestures, facial expression shifts, and motion timing from Image 2 onto the target character from Image 1, cell by cell (Row 1 left-to-right, Row 2 left-to-right, Row 3 left-to-right). "
+        f"Action focus: {action_hint}. "
+        f"LOCKED CAMERA: Completely static camera, identical distance and zoom, solid clean white background, seamless infinite loop from bottom-right back to top-left. "
+        f"LAYOUT: Equal 3x3 grid separated by thin, clean, solid white borders. "
+        f"STRICT NEGATIVE CONSTRAINT: ABSOLUTELY NO numbers, NO digits, NO frame index watermark (such as 01, 02... 09, 1, 2... 9), NO text, NO labels, NO logos. Every panel must contain 100% pure visual artwork. "
         f"STYLE: {style}."
     )
     return prompt

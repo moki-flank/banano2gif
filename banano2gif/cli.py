@@ -15,12 +15,13 @@ from banano2gif import Banano2Gif, ACTION_PRESETS, OFFICIAL_WEBSITE, DEFAULT_BAS
 
 def main():
     parser = argparse.ArgumentParser(
-        description="banano2gif: 支持文生、图生(参考图)、视频生、透明背景化的 AI 连续动图与表情包制作工具",
+        description="banano2gif: 支持文生、图生、视频生、跨角色动作迁移、智能透明背景的 AI 动图引擎",
         epilog=f"获取官方 API Key 请访问: {OFFICIAL_WEBSITE}",
     )
-    parser.add_argument("prompt", nargs="?", default="", help="动作或表情包描述（文生图时必填，图生图时选填）")
-    parser.add_argument("--image", default="", help="【图生动图】传入参考角色图片文件路径或 URL 进行锁脸/锁特征生成")
-    parser.add_argument("--video", default="", help="【视频生动图】传入本地视频文件路径 (.mp4, .mov, .webm 等) 直接转为表情包 GIF/WebP")
+    parser.add_argument("prompt", nargs="?", default="", help="动作或表情包描述（选填）")
+    parser.add_argument("--image", default="", help="【图生/动作迁移】目标角色人设参考图路径或 URL (进行锁脸/锁人设)")
+    parser.add_argument("--motion-source", default="", help="【动作迁移】提供动作模板来源的动图/视频文件 (.gif, .webp, .mp4)，从中抽取动作九宫格迁移给 --image 目标角色")
+    parser.add_argument("--video", default="", help="【视频生动图】传入本地视频文件路径 (.mp4, .mov 等) 直接转为表情包 GIF/WebP")
     parser.add_argument("--preset", choices=list(ACTION_PRESETS.keys()), help="选择内置微动作模板 (waving, petting, laughing, crying, heart_wink, thumbs_up)")
     parser.add_argument("--list-presets", action="store_true", help="查看所有支持的内置动作模板")
     parser.add_argument("--transparent", action="store_true", help="【智能去底】自动识别外围纯色背景并透明化（输出含 Alpha 通道的高清透明 WebP 与 GIF）")
@@ -48,6 +49,30 @@ def main():
     )
 
     try:
+        # 模式 1: 动作生成迁移 (Motion Transfer)
+        if args.motion_source and args.image:
+            res = app.transfer_motion(
+                source_media=args.motion_source,
+                target_image=args.image,
+                action_hint=args.prompt or "transfer the exact 9-step motion and poses from the motion guide to the target character",
+                style=args.style,
+                output_dir=args.out,
+                duration_ms=args.duration,
+                transparent=args.transparent,
+            )
+            print("\n" + "=" * 50)
+            print("🎉 动作迁移大功告成！")
+            print(f"🎥 源动作媒体: {res['source_media']}")
+            print(f"🖼️ 目标角色图: {res['target_image']}")
+            print(f"📐 抽取的动作九宫格指南: {res['motion_guide']}")
+            print(f"📁 生成的迁移九宫格:     {res['grid_image']}")
+            print(f"✨ 最终迁移 GIF 动图:   {res['gif_path']}")
+            print(f"🌐 最终迁移 WebP 动图:  {res.get('webp_path')}")
+            print(f"🔍 透明化去底: {'已开启' if args.transparent else '未开启'}")
+            print("=" * 50 + "\n")
+            return
+
+        # 模式 2: 纯视频转动图 (Video-to-GIF)
         if args.video:
             out_file = os.path.join(args.out, "video_animation.gif")
             res = app.video_to_gif(video_path=args.video, output_path=out_file, fps=args.fps)
@@ -58,6 +83,7 @@ def main():
             print("=" * 50 + "\n")
             return
 
+        # 模式 3: 图生动图 (参考图)
         if args.image:
             res = app.image_to_gif(
                 image_path=args.image,
@@ -75,15 +101,15 @@ def main():
             print(f"✨ GIF 动图:   {res['gif_path']}")
             print(f"🌐 WebP 动图:  {res.get('webp_path')}")
             print(f"🔍 透明化去底: {'已开启 (含Alpha通道)' if args.transparent else '未开启'}")
-            print(f"🔑 官网地址:   {res['official_website']}")
             print("=" * 50 + "\n")
             return
 
         if not args.prompt and not args.preset:
             parser.print_help()
-            print(f"\n提示：请输入动作描述，或指定 --image 参考图，或指定 --video 视频文件。\n官方平台与 API Key 获取地址: {OFFICIAL_WEBSITE}\n")
+            print(f"\n提示：请输入动作描述，或指定 --image 参考图，或使用 --motion-source 进行动作迁移。\n官方平台与 API Key 获取地址: {OFFICIAL_WEBSITE}\n")
             sys.exit(1)
 
+        # 模式 4: 文生动图
         res = app.text_to_gif(
             prompt=args.prompt,
             preset=args.preset,
@@ -98,7 +124,6 @@ def main():
         print(f"✨ GIF 动图:   {res['gif_path']}")
         print(f"🌐 WebP 动图:  {res.get('webp_path')}")
         print(f"🔍 透明化去底: {'已开启 (含Alpha通道)' if args.transparent else '未开启'}")
-        print(f"🔑 官网地址:   {res['official_website']}")
         print("=" * 50 + "\n")
 
     except Exception as e:
