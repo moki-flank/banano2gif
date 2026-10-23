@@ -7,7 +7,8 @@ banano2gif 核心流水线引擎
   3. 动作迁移 (Motion-Transfer / 从GIF、WebP、视频中提取动作迁移到新人设图)
   4. 视频直转动图 (Video-to-GIF)
   5. 智能透明背景化 (Alpha Channel Matting)
-  6. 【4K 超高清规格 (4K 4096x4096 UHD)】自适应九宫格生成与超采样导出
+  6. 4K 超高清规格 (4K 4096x4096 UHD)
+  7. 【多规格网格控制精度】：支持 3x3 九宫格 (9帧) 与 4x4 十六宫格 (16帧超丝滑)
 """
 
 import os
@@ -44,20 +45,22 @@ class Banano2Gif:
         self,
         prompt: str,
         preset: Optional[str] = None,
+        grid: str = "3x3",
         style: str = "High-end 3D animation render, soft ambient lighting, clean solid white background, Pop Mart collectible figurine style",
         output_dir: str = "output",
         gif_filename: str = "animation.gif",
-        duration_ms: int = 180,
+        duration_ms: Optional[int] = None,
         crop_size: Optional[int] = None,
         export_size: Optional[int] = None,
         transparent: bool = False,
         is_4k: bool = False,
     ) -> Dict[str, Any]:
-        """【文生动图】支持 1024 与 4K 超高分规格。"""
+        """【文生动图】支持 3x3 (9帧) 与 4x4 (16帧)。"""
         return self._generate_from_prompt(
             prompt=prompt,
             images=None,
             preset=preset,
+            grid=grid,
             style=style,
             output_dir=output_dir,
             gif_filename=gif_filename,
@@ -74,16 +77,17 @@ class Banano2Gif:
         image_path: str,
         prompt: str = "gently waving and smiling happily",
         preset: Optional[str] = None,
+        grid: str = "3x3",
         style: str = "Preserve original character art style, high quality render, clean solid white background",
         output_dir: str = "output",
         gif_filename: str = "image_animation.gif",
-        duration_ms: int = 180,
+        duration_ms: Optional[int] = None,
         crop_size: Optional[int] = None,
         export_size: Optional[int] = None,
         transparent: bool = False,
         is_4k: bool = False,
     ) -> Dict[str, Any]:
-        """【图生动图 / 参考图生图】支持 1024 与 4K 超高分规格。"""
+        """【图生动图 / 参考图生图】支持 3x3 与 4x4 规格。"""
         if not os.path.isfile(image_path) and not image_path.startswith(("http://", "https://")):
             raise FileNotFoundError(f"未找到参考图片文件: {image_path}")
 
@@ -91,6 +95,7 @@ class Banano2Gif:
             prompt=prompt,
             images=[image_path],
             preset=preset,
+            grid=grid,
             style=style,
             output_dir=output_dir,
             gif_filename=gif_filename,
@@ -106,29 +111,31 @@ class Banano2Gif:
         self,
         source_media: str,
         target_image: str,
-        action_hint: str = "transfer the exact 9-step motion and poses from the motion guide to the target character",
+        action_hint: str = "transfer the exact motion and poses from the motion guide to the target character",
+        grid: str = "3x3",
         style: str = "Preserve target character art style, high quality render, clean solid white background",
         output_dir: str = "output",
         gif_filename: str = "motion_transfer.gif",
-        duration_ms: int = 180,
+        duration_ms: Optional[int] = None,
         crop_size: Optional[int] = None,
         export_size: Optional[int] = None,
         transparent: bool = False,
         is_4k: bool = False,
     ) -> Dict[str, Any]:
-        """【动作生成迁移】支持 4K 超高清九宫格输出。"""
+        """【动作生成迁移】支持 3x3 与 4x4 动作指南。"""
         os.makedirs(output_dir, exist_ok=True)
         if not os.path.isfile(source_media):
             raise FileNotFoundError(f"未找到源动作媒体文件: {source_media}")
         if not os.path.isfile(target_image):
             raise FileNotFoundError(f"未找到目标角色人设图片: {target_image}")
 
-        guide_grid_path = os.path.join(output_dir, "motion_guide_grid.jpg")
+        is_16 = "4" in str(grid) or str(grid) == "16"
         grid_dim = 4096 if is_4k else 1024
-        print(f"[banano2gif] 1. 正在从源媒体抽取 9 帧关键动作九宫格 ({grid_dim}x{grid_dim}): {source_media}...")
-        create_motion_guide_grid(source_media, output_grid_path=guide_grid_path, grid_size=grid_dim)
+        guide_grid_path = os.path.join(output_dir, "motion_guide_grid.jpg")
+        print(f"[banano2gif] 1. 正在从源媒体抽取关键动作 ({'4x4 16帧' if is_16 else '3x3 9帧'}): {source_media}...")
+        create_motion_guide_grid(source_media, output_grid_path=guide_grid_path, grid_layout=grid, grid_size=grid_dim)
 
-        full_prompt = build_motion_transfer_prompt(action_hint=action_hint, style=style, is_4k=is_4k)
+        full_prompt = build_motion_transfer_prompt(action_hint=action_hint, grid=grid, style=style, is_4k=is_4k)
         grid_save_path = os.path.join(output_dir, "transferred_grid.jpg")
         frames_dir = os.path.join(output_dir, "transferred_frames")
         gif_save_path = os.path.join(output_dir, gif_filename)
@@ -154,29 +161,33 @@ class Banano2Gif:
         else:
             raise RuntimeError(f"未能从模型返回中提取有效图片数据: {resp}")
 
-        print(f"[banano2gif] 3. 正在进行自适应九宫格切帧 (透明去底: {transparent})...")
+        print(f"[banano2gif] 3. 正在切帧 (网格: {grid}, 透明去底: {transparent})...")
         frames = slice_grid(
             grid_save_path,
             output_dir=frames_dir,
+            grid_layout=grid,
             crop_size=crop_size,
             export_size=export_size,
             transparent=transparent,
         )
 
-        print(f"[banano2gif] 4. 正在合成动图 ({duration_ms}ms/帧)...")
-        gif_path = build_gif(frames, output_path=gif_save_path, duration_ms=duration_ms)
+        eff_duration = duration_ms or (100 if is_16 else 180)
+        print(f"[banano2gif] 4. 正在合成动图 ({eff_duration}ms/帧, 共 {len(frames)} 帧)...")
+        gif_path = build_gif(frames, output_path=gif_save_path, duration_ms=eff_duration)
         webp_save_path = os.path.splitext(gif_save_path)[0] + ".webp"
-        build_gif(frames, output_path=webp_save_path, duration_ms=duration_ms)
+        build_gif(frames, output_path=webp_save_path, duration_ms=eff_duration)
 
         return {
             "ok": True,
             "mode": "motion_transfer",
+            "grid": "4x4" if is_16 else "3x3",
             "is_4k": is_4k,
             "source_media": source_media,
             "target_image": target_image,
             "motion_guide": guide_grid_path,
             "grid_image": grid_save_path,
             "frames_dir": frames_dir,
+            "total_frames": len(frames),
             "gif_path": gif_path,
             "webp_path": webp_save_path,
             "official_website": OFFICIAL_WEBSITE,
@@ -211,10 +222,11 @@ class Banano2Gif:
         prompt: str,
         images: Optional[List[str]],
         preset: Optional[str],
+        grid: str,
         style: str,
         output_dir: str,
         gif_filename: str,
-        duration_ms: int,
+        duration_ms: Optional[int],
         crop_size: Optional[int],
         export_size: Optional[int],
         transparent: bool,
@@ -226,16 +238,20 @@ class Banano2Gif:
         frames_dir = os.path.join(output_dir, "frames")
         gif_save_path = os.path.join(output_dir, gif_filename)
 
+        is_16 = "4" in str(grid) or str(grid) == "16"
+        grid_label = "4x4 (16帧)" if is_16 else "3x3 (9帧)"
+
         full_prompt = build_prompt(
             subject_and_action=prompt,
             preset=preset,
+            grid=grid,
             style=style,
             has_reference_image=bool(images),
             is_4k=is_4k,
         )
 
         req_size = "4096x4096" if is_4k else "1024x1024"
-        print(f"[banano2gif] 模式: {mode} (规格: {req_size}, 透明去底: {'开启' if transparent else '关闭'})")
+        print(f"[banano2gif] 模式: {mode} | 网格: {grid_label} (规格: {req_size}, 透明去底: {'开启' if transparent else '关闭'})")
         print(f"[banano2gif] 1. 请求大模型生图 (模型: {self.model})...")
 
         resp = self.client.generate_image(
@@ -256,29 +272,27 @@ class Banano2Gif:
         else:
             raise RuntimeError(f"未能从模型返回中提取有效图片数据: {resp}")
 
-        # 读取返回图实际分辨率，自适应精准裁切
-        with Image.open(grid_save_path) as actual_im:
-            act_w, act_h = actual_im.size
-            print(f"[banano2gif] 实际九宫格分辨率: {act_w}x{act_h}")
-
-        print(f"[banano2gif] 2. 正在进行高精度九宫格自适应裁切 (透明化: {transparent})...")
+        print(f"[banano2gif] 2. 正在进行高精度自适应切帧 (网格: {grid_label}, 透明化: {transparent})...")
         frames = slice_grid(
             grid_save_path,
             output_dir=frames_dir,
+            grid_layout=grid,
             crop_size=crop_size,
             export_size=export_size,
             transparent=transparent,
         )
 
-        print(f"[banano2gif] 3. 正在合成动图 ({duration_ms}ms/帧, 单帧尺寸: {frames[0].width}x{frames[0].height})...")
-        gif_path = build_gif(frames, output_path=gif_save_path, duration_ms=duration_ms)
+        eff_duration = duration_ms or (100 if is_16 else 180)
+        print(f"[banano2gif] 3. 正在合成动图 ({eff_duration}ms/帧, 共 {len(frames)} 帧, 单帧: {frames[0].width}x{frames[0].height})...")
+        gif_path = build_gif(frames, output_path=gif_save_path, duration_ms=eff_duration)
 
         webp_save_path = os.path.splitext(gif_save_path)[0] + ".webp"
-        build_gif(frames, output_path=webp_save_path, duration_ms=duration_ms)
+        build_gif(frames, output_path=webp_save_path, duration_ms=eff_duration)
 
         return {
             "ok": True,
             "mode": mode,
+            "grid": "4x4" if is_16 else "3x3",
             "is_4k": is_4k,
             "transparent": transparent,
             "gif_path": gif_path,
@@ -298,6 +312,7 @@ def banano2gif(
     video_path: Optional[str] = None,
     motion_source: Optional[str] = None,
     preset: Optional[str] = None,
+    grid: str = "3x3",
     transparent: bool = False,
     is_4k: bool = False,
     export_size: Optional[int] = None,
@@ -306,7 +321,7 @@ def banano2gif(
     model: str = DEFAULT_MODEL,
     style: str = "High-end 3D animation render, soft ambient lighting, clean solid white background, Pop Mart collectible figurine style",
     output_dir: str = "output",
-    duration_ms: int = 180,
+    duration_ms: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     智能统一接口：自动根据传入参数分流执行：
@@ -314,7 +329,7 @@ def banano2gif(
       - 视频转动图 (video_path)
       - 图生动图 (image_path)
       - 文生动图 (prompt)
-    支持 is_4k=True 开启 4K 超高分出图与自适应裁切。
+    支持 grid="4x4" 开启 16 宫格高帧率模式。
     """
     app = Banano2Gif(api_key=api_key, base_url=base_url, model=model)
 
@@ -322,7 +337,8 @@ def banano2gif(
         return app.transfer_motion(
             source_media=motion_source,
             target_image=image_path,
-            action_hint=prompt or "transfer the exact 9-step motion and poses from the motion guide to the target character",
+            action_hint=prompt or "transfer the exact motion and poses from the motion guide to the target character",
+            grid=grid,
             style=style,
             output_dir=output_dir,
             duration_ms=duration_ms,
@@ -341,6 +357,7 @@ def banano2gif(
             image_path=image_path,
             prompt=act_prompt,
             preset=preset,
+            grid=grid,
             style=style,
             output_dir=output_dir,
             duration_ms=duration_ms,
@@ -353,6 +370,7 @@ def banano2gif(
     return app.text_to_gif(
         prompt=act_prompt,
         preset=preset,
+        grid=grid,
         style=style,
         output_dir=output_dir,
         duration_ms=duration_ms,

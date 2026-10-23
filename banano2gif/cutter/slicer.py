@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-九宫格高精度自适应切割器：
-全面支持 1024x1024、2048x2048、4096x4096 (4K) 等任意超高分辨率九宫格！
+多规格连续序列帧自适应切割器：
+原生支持【3x3 九宫格 (9帧)】与【4x4 十六宫格 (16帧)】以及任意高分辨率 (1024 / 2048 / 4096 4K)！
 动态计算单元格中心与裁切范围，完美规避分割线，零白边、零抖动。
 """
 
@@ -15,21 +15,21 @@ from .matting import remove_background
 def slice_grid(
     image_input: Union[str, Image.Image],
     output_dir: Optional[str] = None,
+    grid_layout: Union[str, Tuple[int, int]] = (3, 3),
     crop_size: Optional[int] = None,
     export_size: Optional[int] = None,
     transparent: bool = False,
 ) -> List[Image.Image]:
     """
-    将 3x3 九宫格图片切割为 9 张独立图像（原生支持 4K 超高分）。
+    自适应切割九宫格 (3x3) 或十六宫格 (4x4)。
     
     参数：
       image_input: 图片文件路径或 PIL.Image 对象
-      output_dir: 若传入路径，则自动将 9 帧保存为 frame_01.png ~ frame_09.png
-      crop_size: 每帧裁切的正方形边长。若为 None 则自适应按比例（约占单元格 93.75%）裁切，
-                 如 1024 图裁 320px，4K 图 (4096) 裁 1280px 原生超高清
-      export_size: 最终导出目标尺寸。若指定（如 320），则通过 Lanczos 算法超采样缩放，
-                   保持 4K 的极致锐度与细节的同时压缩体积；若为 None 则保留原分辨率
-      transparent: 是否自动去除纯色背景，输出含 Alpha 通道的透明图
+      output_dir: 若传入路径，则保存切片
+      grid_layout: 网格布局规格，支持 (3, 3)、(4, 4) 或字符串 "3x3"、"4x4"、"9"、"16"
+      crop_size: 每帧裁切尺寸，None 时自适应保留单元格的 93.75% 画面
+      export_size: 最终导出单帧尺寸 (如 320, 240, 或 None 保持原生超清)
+      transparent: 是否自动去除纯色背景 (生成 Alpha 通道)
     """
     if isinstance(image_input, str):
         im = Image.open(image_input).convert("RGB")
@@ -38,13 +38,23 @@ def slice_grid(
 
     width, height = im.size
 
-    # 自适应步长与中心点计算（支持 1024、2048、4096 或任意分辨率）
-    step_x = width / 3.0
-    step_y = height / 3.0
-    cell_centers_x = [step_x * 0.5, step_x * 1.5, step_x * 2.5]
-    cell_centers_y = [step_y * 0.5, step_y * 1.5, step_y * 2.5]
+    # 解析行列数
+    if isinstance(grid_layout, str):
+        gl = grid_layout.lower().strip()
+        if "4" in gl or gl == "16":
+            rows, cols = 4, 4
+        else:
+            rows, cols = 3, 3
+    else:
+        rows, cols = grid_layout
 
-    # 动态自适应裁切尺寸：取单元格宽度的 93.75%，确保四周预留足够的安全边距避开分割线
+    step_x = width / float(cols)
+    step_y = height / float(rows)
+
+    cell_centers_x = [step_x * (c + 0.5) for c in range(cols)]
+    cell_centers_y = [step_y * (r + 0.5) for r in range(rows)]
+
+    # 动态安全裁切尺寸（避开分割线）
     if crop_size is None or crop_size <= 0:
         crop_size = int(round(min(step_x, step_y) * 0.9375))
 
@@ -55,8 +65,8 @@ def slice_grid(
         os.makedirs(output_dir, exist_ok=True)
 
     frame_idx = 1
-    for r in range(3):
-        for c in range(3):
+    for r in range(rows):
+        for c in range(cols):
             cx = cell_centers_x[c]
             cy = cell_centers_y[r]
 
@@ -72,7 +82,6 @@ def slice_grid(
             if transparent:
                 frame = remove_background(frame)
 
-            # 若指定了目标导出尺寸，进行高质量超采样缩放
             if export_size and export_size > 0 and (frame.width != export_size or frame.height != export_size):
                 frame = frame.resize((export_size, export_size), Image.Resampling.LANCZOS)
 

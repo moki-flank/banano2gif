@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-动作九宫格提取器 (Motion Grid Extractor)
-从任意输入动图 (.gif, .webp) 或视频 (.mp4, .mov, etc.) 中智能均匀抽取 9 帧关键帧，
-拼接为标准 3x3 动作参考九宫格（Motion Guide Sheet），用于引导大模型进行动作生成迁移。
-支持 1024 与 4096 (4K) 规格输出。
+动作连续帧网格提取器 (Motion Grid Extractor)
+从任意输入动图 (.gif, .webp) 或视频 (.mp4, .mov, etc.) 中智能均匀抽取关键帧，
+拼接为 3x3 (9帧) 或 4x4 (16帧) 动作参考图，用于引导大模型进行动作生成迁移。
 """
 
 import os
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 from PIL import Image, ImageSequence
 
 try:
@@ -18,7 +17,7 @@ except ImportError:
 
 
 def extract_frames_from_media(media_path: str, target_frame_count: int = 9) -> List[Image.Image]:
-    """从 GIF/WebP 或视频文件中抽取指定数量（默认9帧）的关键帧"""
+    """从 GIF/WebP 或视频文件中抽取指定数量的关键帧"""
     if not os.path.isfile(media_path):
         raise FileNotFoundError(f"未找到输入媒体文件: {media_path}")
 
@@ -53,20 +52,28 @@ def extract_frames_from_media(media_path: str, target_frame_count: int = 9) -> L
 def create_motion_guide_grid(
     media_path: str,
     output_grid_path: str = "motion_guide_grid.jpg",
+    grid_layout: Union[str, Tuple[int, int]] = (3, 3),
     grid_size: int = 1024,
 ) -> str:
     """
-    抽取 9 帧关键帧并拼贴成 3x3 动作参考图 (支持 1024 及 4096 4K 尺寸)。
+    抽取关键帧并拼贴成 3x3 或 4x4 动作参考图。
     """
-    frames = extract_frames_from_media(media_path, target_frame_count=9)
+    if isinstance(grid_layout, str):
+        gl = grid_layout.lower().strip()
+        rows, cols = (4, 4) if ("4" in gl or gl == "16") else (3, 3)
+    else:
+        rows, cols = grid_layout
 
-    cell_size = grid_size // 3
+    target_count = rows * cols
+    frames = extract_frames_from_media(media_path, target_frame_count=target_count)
+
+    cell_size = grid_size // cols
     margin = 4 if grid_size >= 2048 else 2
     grid_img = Image.new("RGB", (grid_size, grid_size), color=(255, 255, 255))
 
     for idx, frame in enumerate(frames):
-        row = idx // 3
-        col = idx % 3
+        row = idx // cols
+        col = idx % cols
 
         w, h = frame.size
         min_side = min(w, h)
