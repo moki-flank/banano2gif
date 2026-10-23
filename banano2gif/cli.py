@@ -15,7 +15,7 @@ from banano2gif import Banano2Gif, ACTION_PRESETS, OFFICIAL_WEBSITE, DEFAULT_BAS
 
 def main():
     parser = argparse.ArgumentParser(
-        description="banano2gif: 支持文生、图生、视频生、跨角色动作迁移、智能透明背景的 AI 动图引擎",
+        description="banano2gif: 支持 4K 超高分、文生、图生、视频生、动作迁移、智能透明背景的 AI 动图引擎",
         epilog=f"获取官方 API Key 请访问: {OFFICIAL_WEBSITE}",
     )
     parser.add_argument("prompt", nargs="?", default="", help="动作或表情包描述（选填）")
@@ -24,6 +24,8 @@ def main():
     parser.add_argument("--video", default="", help="【视频生动图】传入本地视频文件路径 (.mp4, .mov 等) 直接转为表情包 GIF/WebP")
     parser.add_argument("--preset", choices=list(ACTION_PRESETS.keys()), help="选择内置微动作模板 (waving, petting, laughing, crying, heart_wink, thumbs_up)")
     parser.add_argument("--list-presets", action="store_true", help="查看所有支持的内置动作模板")
+    parser.add_argument("--4k", action="store_true", dest="is_4k", help="【4K 超高清规格】开启 4096x4096 极致九宫格生图与高精度自适应切图")
+    parser.add_argument("--export-size", type=int, default=None, help="导出动图单帧尺寸（如 320 或 480，适合表情包体积限制；不传则保持原生分辨率）")
     parser.add_argument("--transparent", action="store_true", help="【智能去底】自动识别外围纯色背景并透明化（输出含 Alpha 通道的高清透明 WebP 与 GIF）")
     parser.add_argument("--style", default="High-end 3D animation render, soft ambient lighting, clean solid white background, Pop Mart collectible figurine style", help="画面风格")
     parser.add_argument("--key", default="", help=f"HrioAPI Key (未指定则读取环境变量 HRIO_API_KEY，可在 {OFFICIAL_WEBSITE} 获取)")
@@ -39,7 +41,7 @@ def main():
         print("\n=== banano2gif 内置微动作预设 ===")
         for k, v in ACTION_PRESETS.items():
             print(f"  * {k:12s} - {v['title']} ({v['description']})")
-        print(f"\n使用示例: python main.py \"可爱的柴犬\" --preset waving --transparent\n")
+        print(f"\n使用示例: python main.py \"可爱的柴犬\" --preset waving --4k --transparent\n")
         return
 
     app = Banano2Gif(
@@ -59,6 +61,8 @@ def main():
                 output_dir=args.out,
                 duration_ms=args.duration,
                 transparent=args.transparent,
+                is_4k=args.is_4k,
+                export_size=args.export_size,
             )
             print("\n" + "=" * 50)
             print("🎉 动作迁移大功告成！")
@@ -68,6 +72,7 @@ def main():
             print(f"📁 生成的迁移九宫格:     {res['grid_image']}")
             print(f"✨ 最终迁移 GIF 动图:   {res['gif_path']}")
             print(f"🌐 最终迁移 WebP 动图:  {res.get('webp_path')}")
+            print(f"💎 4K 超高规格: {'已开启' if args.is_4k else '标准规格'}")
             print(f"🔍 透明化去底: {'已开启' if args.transparent else '未开启'}")
             print("=" * 50 + "\n")
             return
@@ -93,6 +98,8 @@ def main():
                 output_dir=args.out,
                 duration_ms=args.duration,
                 transparent=args.transparent,
+                is_4k=args.is_4k,
+                export_size=args.export_size,
             )
             print("\n" + "=" * 50)
             print("🎉 图生动图制作成功！")
@@ -100,6 +107,7 @@ def main():
             print(f"📁 九宫格原图: {res['grid_image']}")
             print(f"✨ GIF 动图:   {res['gif_path']}")
             print(f"🌐 WebP 动图:  {res.get('webp_path')}")
+            print(f"💎 4K 规格:    {'4096x4096 (超采样输出)' if args.is_4k else '1024x1024'}")
             print(f"🔍 透明化去底: {'已开启 (含Alpha通道)' if args.transparent else '未开启'}")
             print("=" * 50 + "\n")
             return
@@ -117,12 +125,15 @@ def main():
             output_dir=args.out,
             duration_ms=args.duration,
             transparent=args.transparent,
+            is_4k=args.is_4k,
+            export_size=args.export_size,
         )
         print("\n" + "=" * 50)
         print("🎉 文生动图制作成功！")
         print(f"📁 九宫格原图: {res['grid_image']}")
         print(f"✨ GIF 动图:   {res['gif_path']}")
         print(f"🌐 WebP 动图:  {res.get('webp_path')}")
+        print(f"💎 4K 规格:    {'4096x4096 (超采样输出)' if args.is_4k else '1024x1024'}")
         print(f"🔍 透明化去底: {'已开启 (含Alpha通道)' if args.transparent else '未开启'}")
         print("=" * 50 + "\n")
 

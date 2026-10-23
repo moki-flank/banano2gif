@@ -1,9 +1,10 @@
 # banano2gif 🍌➡️🎞️
 
 > **全能 AI 表情包与动态帧生成引擎**  
+> 原生支持【**4K 超高清九宫格出图 (4096x4096)**】！  
 > 支持【**文生动图**、**图生动图（垫图/参考图锁脸）**、**动作生成迁移 (Motion Transfer)**、**视频直转动图**】全模态！  
 > 原生支持【**8-bit Alpha 完整半透明通道 WebP 与透明 GIF**】智能去底！  
-> 默认内置官方原生 SDK，开箱即用。彻底去除数字角标，精准对齐切帧，合成丝滑无缝循环动图。
+> 默认内置官方原生 SDK，开箱即用。彻底去除数字角标，精准自适应对齐切帧，合成丝滑无缝循环动图。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-brightgreen.svg)](https://www.python.org/)
@@ -13,7 +14,7 @@
 
 ## 🌟 效果展示 (Demo Showcase)
 
-| 1. AI 渲染九宫格原图 (1024x1024 纯净无角标) | 2. 智能去底透明背景循环动图 (支持 WebP / GIF) |
+| 1. AI 渲染九宫格原图 (纯净无角标) | 2. 智能去底透明背景循环动图 (支持 WebP / GIF) |
 | :---: | :---: |
 | <img src="examples/sample_grid.jpg" width="380" alt="九宫格原图" /> | <img src="examples/sample_crying_transparent.gif" width="300" alt="透明背景无缝循环动图" /> |
 
@@ -39,6 +40,23 @@
 
 ---
 
+## 💎 4K 超高清出图与自适应裁切 (`--4k`)
+
+大模型已具备 4K 级别的图像输出能力，`banano2gif` 全面升级为**分辨率自适应流水线**：
+* **4096 × 4096 超高分辨率生成**：只需传入 `--4k` 参数，即可调用 4K 规格九宫格大图；
+* **自适应中心裁切**：算法动态计算图像尺寸，1024 图切出 320px 单元格，**4K 图直接切出 1280 × 1280 单帧原生超清大图**！
+* **高质量超采样缩放 (`--export-size`)**：若用于微信/QQ 表情包，可通过 `--export-size 320` 自动将 4K 帧进行 Lanczos 超采样缩放——相比直接生成小图，**线条更锐利、噪点为零、画质呈现降维打击**！
+
+```bash
+# 开启 4K 生图，并导出超清动图
+python main.py "可爱的3D柴犬戴着红色围巾" --preset waving --4k --transparent
+
+# 4K 高画质生成 + 超采样压缩为 320px 规范表情包
+python main.py "萌系少女眨眼比心" --preset heart_wink --4k --export-size 320 --transparent
+```
+
+---
+
 ## 🚀 四大核心生成模式 (All-in-One Multimodal)
 
 ### 1. 🎭 动作生成迁移 (Motion Transfer) —— 核心重磅！
@@ -51,7 +69,7 @@ python main.py --image "my_avatar.png" --motion-source "funny_dance.gif" --trans
 ### 2. 🖼️ 图生动图 / 参考图生图 (Image-to-GIF)
 传入用户的头像、照片或立绘作为**参考图（垫图）**，在保持角色面部、五官、发型与穿搭高度一致的前提下，生成专属动作表情包！
 ```bash
-python main.py "委屈哭泣流眼泪" --image "avatar.png" --preset crying --transparent
+python main.py "委屈哭泣流眼泪" --image "avatar.png" --preset crying --4k --transparent
 ```
 
 ### 3. 📝 文生动图 (Text-to-GIF)
@@ -91,17 +109,14 @@ pip install -r requirements.txt
 # 查看所有支持的内置微动作预设
 python main.py --list-presets
 
-# 示例 1: 动作迁移（将 meme.gif 的动作提取并迁移到我的头像 avatar.png 上）
+# 示例 1: 4K 文生动图 + 智能透明化
+python main.py "萌系Q版小女孩摸摸白猫的头" --preset petting --4k --transparent
+
+# 示例 2: 动作迁移（将 meme.gif 的动作提取并迁移到我的头像 avatar.png 上）
 python main.py --image "my_avatar.png" --motion-source "meme.gif" --transparent
 
-# 示例 2: 图生图（传入参考头像保持人设一致并去底）
-python main.py "委屈哭泣" --image "avatar.png" --preset crying --transparent
-
-# 示例 3: 文生图并开启透明背景
-python main.py "萌系Q版小女孩摸摸白猫的头" --preset petting --transparent
-
-# 示例 4: 视频直转动图
-python main.py --video "cat_video.mp4" --fps 10
+# 示例 3: 4K 图生动图（传入参考头像保持人设一致）
+python main.py "委屈哭泣" --image "avatar.png" --preset crying --4k --transparent
 ```
 
 ### 3. Python 代码集成
@@ -109,22 +124,18 @@ python main.py --video "cat_video.mp4" --fps 10
 ```python
 from banano2gif import banano2gif
 
-# 1. 动作生成迁移 (Motion Transfer)
-res1 = banano2gif(
-    image_path="target_character.png", # 目标人设图
-    motion_source="source_dance.gif",  # 源动图/视频
-    transparent=True,                  # 开启智能透明背景
+# 开启 4K 模式 (is_4k=True) 并导出透明动图
+result = banano2gif(
+    image_path="avatar.png",
+    preset="crying",
+    is_4k=True,             # 开启 4K 超高分辨率九宫格
+    export_size=320,        # 可选：超采样至 320px 便捷表情包（不传则输出 1280px 超清大图）
+    transparent=True,       # 开启智能透明背景
     duration_ms=180,
 )
 
-# 2. 图生动图 (垫图保持人设一致)
-res2 = banano2gif(image_path="avatar.png", preset="crying", transparent=True)
-
-# 3. 文生动图
-res3 = banano2gif(prompt="宇航员在月球表面跳舞", preset="waving")
-
-print("生成的动图路径:", res1["gif_path"])
-print("生成的WebP路径:", res1["webp_path"])
+print("生成的动图路径:", result["gif_path"])
+print("生成的WebP路径:", result["webp_path"])
 ```
 
 ---

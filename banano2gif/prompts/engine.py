@@ -5,6 +5,7 @@ banano2gif 提示词工程引擎
   1. 文生（Text-to-GIF）：纯自然语言描述生成九宫格连续动图
   2. 图生（Image-to-GIF）：基于用户参考图（头像/立绘/照片）保持高一致性角色生成连续动图
   3. 动作迁移（Motion-Transfer）：基于已有动图/视频提取的动作指南 + 目标人设图，进行跨角色动作迁移
+  4. 【4K 超高清规格】：原生适配 4K (4096x4096 / 2048x2048) 极致细节与画质强化
 彻底去除 1~9 / 01~09 序号，采用纯空间方位映射与微动作渐变闭环。
 """
 
@@ -125,6 +126,7 @@ def build_prompt(
     style: str = "High-end 3D animation render, soft ambient lighting, clean solid white background, Pop Mart collectible figurine style",
     custom_motion: Optional[str] = None,
     has_reference_image: bool = False,
+    is_4k: bool = False,
 ) -> str:
     """常规文生/图生提示词"""
     if custom_motion:
@@ -143,6 +145,8 @@ def build_prompt(
             "Preserve identical facial features, eye shape, hairstyle, hair color, clothing style, key accessories, and aesthetic identity across all 9 panels. "
         )
 
+    resolution_tag = ", ultra high resolution 4K UHD, 4096x4096 resolution, extremely sharp fine details, 8k render, masterpiece" if is_4k else ""
+
     prompt = (
         f"A clean 3x3 animation contact sheet grid consisting of exactly 9 sequential square panels showing ONE continuous, smooth micro-motion cycle: "
         f"{reference_anchor}"
@@ -153,7 +157,7 @@ def build_prompt(
         f"{motion_desc} "
         f"LAYOUT: Equal 3x3 grid separated by thin, clean, solid white borders. "
         f"STRICT NEGATIVE CONSTRAINT: ABSOLUTELY NO numbers, NO digits, NO frame index watermark (such as 01, 02... 09, 1, 2... 9), NO text, NO labels, NO logos, NO captions anywhere in the image. Every panel must contain 100% pure visual artwork. "
-        f"STYLE: {style}."
+        f"STYLE: {style}{resolution_tag}."
     )
     return prompt
 
@@ -161,13 +165,11 @@ def build_prompt(
 def build_motion_transfer_prompt(
     action_hint: str = "transfer the exact 9-step motion and poses from the motion guide to the target character",
     style: str = "Preserve target character art style, high quality render, clean solid white background",
+    is_4k: bool = False,
 ) -> str:
-    """
-    【动作迁移专用提示词】
-    双参考图输入：
-      Image 1: 目标角色外观图 (Target Subject)
-      Image 2: 源动作提取的 3x3 动作参考图 (Motion Guide Grid)
-    """
+    """动作迁移专用提示词（双参考图）"""
+    resolution_tag = ", ultra high resolution 4K UHD, 4096x4096, extremely sharp fine details, 8k render, masterpiece" if is_4k else ""
+
     prompt = (
         f"A clean 3x3 animation contact sheet grid consisting of exactly 9 sequential square panels. "
         f"DUAL REFERENCE MOTION TRANSFER TASK: "
@@ -178,6 +180,6 @@ def build_motion_transfer_prompt(
         f"LOCKED CAMERA: Completely static camera, identical distance and zoom, solid clean white background, seamless infinite loop from bottom-right back to top-left. "
         f"LAYOUT: Equal 3x3 grid separated by thin, clean, solid white borders. "
         f"STRICT NEGATIVE CONSTRAINT: ABSOLUTELY NO numbers, NO digits, NO frame index watermark (such as 01, 02... 09, 1, 2... 9), NO text, NO labels, NO logos. Every panel must contain 100% pure visual artwork. "
-        f"STYLE: {style}."
+        f"STYLE: {style}{resolution_tag}."
     )
     return prompt
